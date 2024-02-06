@@ -5,11 +5,50 @@ import pyqtgraph as pg
 import matplotlib.pyplot as plt
 
 from scipy.fft import fft
+from PyQt5 import QtCore, QtWidgets
+from scipy.signal import cheby1
 from scipy.io.wavfile import write
 
 sample_rate = 44100
 
-duration = 0.2
+duration = 0.1
+
+
+class SignalPlot(QtWidgets.QMainWindow):
+    def __init__(self, time, values):
+        super().__init__()
+
+        self.time = time
+        self.values = values
+
+        self.plot_graph = pg.PlotWidget()
+
+        pen = pg.mkPen(color=(0, 0, 0))
+
+        self.setCentralWidget(self.plot_graph)
+        self.plot_graph.setBackground("w")
+
+        styles = {"color": "black", "font-size": "15px"}
+        self.plot_graph.setLabel("left", "Amplitude", **styles)
+        self.plot_graph.setLabel("bottom", "Time (min)", **styles)
+
+        self.line = self.plot_graph.plot(self.time, self.values, pen=pen)
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.update_plot)
+        self.timer.start()
+
+    def update_plot(self):
+        get_signal = record_signal(duration, sample_rate)
+        self.values = moving_average(get_signal.reshape(-1), 20)
+        self.line.setData(self.time, self.values)
+
+
+def moving_average(signal, window_size):
+    window = np.ones(window_size) / window_size
+    smoothed_signal = np.convolve(signal, window, mode='same')
+
+    return smoothed_signal
 
 
 def record_signal(duration: float, sample_rate: int):
@@ -56,12 +95,12 @@ def plot_fft(signal, interval: int, sample_rate: int, axs, plot_type='log'):
 
 
 if __name__ == '__main__':
-    fig, axs = plt.subplots(nrows=1, ncols=1)
+    signal = record_signal(duration, sample_rate).reshape(-1)
+    signal_length = signal.shape[0] / sample_rate
+    time_list = np.linspace(0, signal_length, signal.shape[0])
 
-    sound = record_signal(duration, sample_rate)
-    print(sound.shape)
-    plot_fft(sound, 1024, sample_rate, axs)
-    # plot_signal(sound, sample_rate, axs)
+    app = QtWidgets.QApplication([])
+    main = SignalPlot(time_list, signal)
 
-    plt.show()
-    write_signal_to_file('sound.wav', sound, sample_rate)
+    main.show()
+    app.exec()
