@@ -9,19 +9,16 @@ from PyQt5 import QtCore, QtWidgets
 from scipy import signal
 from scipy.io.wavfile import write
 
-
 sample_rate = 44100
-interval = 512
-
-duration = 0.01
+interval = 1025
 
 
 class SignalPlot(QtWidgets.QMainWindow):
-    def __init__(self, time, values):
+    def __init__(self, window_size: int, sample_rate: int, interval: int):
         super().__init__()
 
-        self.time = time
-        self.values = values
+        self.time = np.linspace(0, window_size, window_size * sample_rate)
+        self.values = np.zeros(window_size * sample_rate)
 
         self.plot_graph = pg.PlotWidget()
 
@@ -41,8 +38,12 @@ class SignalPlot(QtWidgets.QMainWindow):
         self.timer.start()
 
     def update_plot(self):
+        duration = interval / sample_rate
+
         get_signal = record_signal(duration, sample_rate)
-        self.values = moving_average(get_signal.reshape(-1), 20)
+        self.values = self.values[interval:]
+        self.values = np.append(self.values, get_signal.reshape(-1))
+        # self.values = moving_average(get_signal.reshape(-1), 20)
         self.line.setData(self.time, self.values)
 
 
@@ -64,6 +65,8 @@ class FFTPlot(QtWidgets.QMainWindow):
         if plot_type == 'log':
             self.plot_graph.setLogMode(x=True)
 
+        self.plot_graph.setYRange(-120, 40)
+
         styles = {"color": "black", "font-size": "15px"}
         self.plot_graph.setLabel("left", "PSD [dB]", **styles)
         self.plot_graph.setLabel("bottom", "Frequency [Hz]", **styles)
@@ -75,11 +78,16 @@ class FFTPlot(QtWidgets.QMainWindow):
         self.timer.start()
 
     def update_plot(self):
+        epsilon = 1e-7
+
+        duration = interval / sample_rate
+
         get_signal = record_signal(duration, sample_rate).reshape(-1)
         transformed_signal = signal_fft(get_signal, interval)
-        windowed_fft = transformed_signal * signal.windows.bartlett(interval // 2)
 
-        self.values = windowed_fft # 10 * np.log10(windowed_fft)
+        windowed_fft = transformed_signal  # * signal.windows.hann(interval // 2) + epsilon
+
+        self.values = 10 * np.log(windowed_fft)
         self.line.setData(self.freqs, self.values)
 
 
@@ -134,12 +142,10 @@ def plot_fft(signal, interval: int, sample_rate: int, axs, plot_type='log'):
 
 
 if __name__ == '__main__':
-    sound = record_signal(duration, sample_rate).reshape(-1)
-    signal_length = sound.shape[0] / sample_rate
-    time_list = np.linspace(0, signal_length, sound.shape[0])
 
     app = QtWidgets.QApplication([])
-    main = FFTPlot(sample_rate, interval)
+    # main = SignalPlot(window_size=10, interval=interval, sample_rate=sample_rate)
+    main = FFTPlot(interval=interval, sample_rate=sample_rate)
 
     main.show()
     app.exec()
