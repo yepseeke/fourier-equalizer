@@ -1,3 +1,4 @@
+import numpy as np
 import pyqtgraph as pg
 
 from PyQt5 import QtCore, QtWidgets
@@ -51,45 +52,61 @@ class FFTPlot(QtWidgets.QMainWindow):
         self.sample_rate = sample_rate
         self.interval = interval
 
+        # Creating array of frequencies
         self.freqs = np.linspace(0, sample_rate // 2, interval // 2)
-        self.values = np.zeros(interval // 2)
-        self.interval = interval
 
+        # Defining values of the amplitude spectrum
+        duration = self.interval / self.sample_rate
+        self.signal = record_signal(duration, self.sample_rate).reshape(-1)
+        transformed_signal = signal_fft(self.signal, self.interval)
+        self.values = 20 * np.log(transformed_signal)
+
+        # Creating widget
         self.plot_graph = pg.PlotWidget()
 
+        # Widget params
         pen = pg.mkPen(color=(1, 1, 1))
 
         self.setCentralWidget(self.plot_graph)
         self.plot_graph.setBackground("yellow")
-
-        if plot_type == 'log':
-            self.plot_graph.setLogMode(x=True)
-
         self.plot_graph.setYRange(-180, 40)
-
         styles = {"color": "black", "font-size": "15px"}
         self.plot_graph.setLabel("left", "PSD [dB]", **styles)
         self.plot_graph.setLabel("bottom", "Frequency [Hz]", **styles)
 
+        if plot_type == 'log':
+            self.plot_graph.setLogMode(x=True)
+
+        # Plot data
         self.line = self.plot_graph.plot(self.freqs, self.values, pen=pen)
 
+        # Updating plot
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.update_plot)
         self.timer.start()
 
     def update_plot(self):
-        # epsilon = 1e-7
+        self.plot_graph.setYRange(-180, 40)
 
-        duration = self.interval / self.sample_rate
-        get_signal = record_signal(duration, self.sample_rate).reshape(-1)
+        # Recording new data
+        new_interval = self.interval // 4
+        duration = new_interval / self.sample_rate
+        get_new_signal = record_signal(duration, self.sample_rate).reshape(-1)
+        self.signal = self.signal[new_interval:]
+        self.signal = np.append(self.signal, get_new_signal)
+        transformed_signal = signal_fft(self.signal, self.interval)
+
+        # Updating spectrum values
+        self.values = []
+        self.values = np.append(self.values, 20 * np.log(transformed_signal))
+
+        self.line.setData(self.freqs, self.values)
 
         # Applying filter
-        sos = signal.ellip(3, 5, 40, 100, 'hp', fs=self.sample_rate, output='sos')
-        filtered_signal = signal.sosfilt(sos, get_signal)
-
-        transformed_signal = signal_fft(filtered_signal, self.interval)
-
-        # windowed_fft = transformed_signal  # * signal.windows.hann(interval // 2) + epsilon
-
-        self.values = 20 * np.log(transformed_signal)
-        self.line.setData(self.freqs, self.values)
+        # sos = signal.ellip(3, 5, 40, 300, 'hp', fs=self.sample_rate, output='sos')
+        # filtered_signal = signal.sosfilt(sos, get_signal)
+        #
+        # transformed_signal = signal_fft(filtered_signal, self.interval)
+        #
+        # self.values = 20 * np.log(transformed_signal)
+        # self.line.setData(self.freqs, self.values)
