@@ -27,8 +27,9 @@ class Square(pygame.sprite.Sprite):
 
 
 def generate_squares_group(x: int, n: int, color_on, color_off, size, max_value, group):
+    epsilon = 1e-1
     for i in range(n):
-        group.add(Square(x, 30 + 40 * i, color_on, color_off, size, max_value - (max_value * (i + 1)) / n))
+        group.add(Square(x, 30 + 40 * i, color_on, color_off, size, max_value - (max_value * (i + 1)) / n + epsilon))
 
 
 def find_max_in_frequency_ranges(frequency_ranges, spectrum, sample_rate):
@@ -56,29 +57,19 @@ if __name__ == '__main__':
 
     pygame.init()
 
-    squares_range_1 = pygame.sprite.Group()
-    squares_range_2 = pygame.sprite.Group()
-    squares_range_3 = pygame.sprite.Group()
-    squares_range_4 = pygame.sprite.Group()
-    squares_range_5 = pygame.sprite.Group()
-    squares_range_6 = pygame.sprite.Group()
-    squares_range_7 = pygame.sprite.Group()
-    squares_range_8 = pygame.sprite.Group()
-    squares_range_9 = pygame.sprite.Group()
-    squares_range_10 = pygame.sprite.Group()
-    squares_range_11 = pygame.sprite.Group()
+    groups_of_squares = []
+    n_squares_in_group = 12
+    x_value = 100
+    color_off = (255, 0, 0)
+    color_on = (0, 155, 0)
+    size = (30, 20)
+    max_value = 8
 
-    generate_squares_group(100, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_1)
-    generate_squares_group(140, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_2)
-    generate_squares_group(180, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_3)
-    generate_squares_group(220, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_4)
-    generate_squares_group(260, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_5)
-    generate_squares_group(300, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_6)
-    generate_squares_group(340, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_7)
-    generate_squares_group(380, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_8)
-    generate_squares_group(420, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_9)
-    generate_squares_group(460, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_10)
-    generate_squares_group(500, 10, (0, 155, 0), (255, 0, 0), (30, 30), 7, squares_range_11)
+    for i in range(len(ranges)):
+        group_of_square = pygame.sprite.Group()
+        generate_squares_group(x_value + 40 * i, n_squares_in_group, color_on, color_off,
+                               size, max_value, group_of_square)
+        groups_of_squares.append(group_of_square)
 
     sc = pygame.display.set_mode((800, 600))
 
@@ -103,17 +94,9 @@ if __name__ == '__main__':
         sound = np.append(sound, new_sound)
 
         sc.fill((0, 0, 0))
-        squares_range_1.draw(sc)
-        squares_range_2.draw(sc)
-        squares_range_3.draw(sc)
-        squares_range_4.draw(sc)
-        squares_range_5.draw(sc)
-        squares_range_6.draw(sc)
-        squares_range_7.draw(sc)
-        squares_range_8.draw(sc)
-        squares_range_9.draw(sc)
-        squares_range_10.draw(sc)
-        squares_range_11.draw(sc)
+
+        for i in range(len(groups_of_squares)):
+            groups_of_squares[i].draw(sc)
 
         # value_coordinate += 1 / (5 * np.pi)
         value = arr[0]
@@ -122,14 +105,5 @@ if __name__ == '__main__':
 
         clock.tick(144)
 
-        squares_range_1.update(arr[0])
-        squares_range_2.update(arr[1])
-        squares_range_3.update(arr[2])
-        squares_range_4.update(arr[3])
-        squares_range_5.update(arr[4])
-        squares_range_6.update(arr[5])
-        squares_range_7.update(arr[6])
-        squares_range_8.update(arr[7])
-        squares_range_9.update(arr[8])
-        squares_range_10.update(arr[9])
-        squares_range_11.update(arr[10])
+        for i in range(len(groups_of_squares)):
+            groups_of_squares[i].update(arr[i])
