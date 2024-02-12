@@ -1,7 +1,6 @@
 import numpy as np
 import pygame
-# import numpy as np
-from signals import *
+from signals import SignalProcessor
 import sys
 
 
@@ -50,7 +49,7 @@ def find_max_in_frequency_ranges(frequency_ranges, spectrum, sample_rate):
     return max_elements
 
 
-if __name__ == '__main__':
+def run():
     pygame.init()
 
     interval = 4410

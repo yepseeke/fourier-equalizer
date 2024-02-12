@@ -1,46 +1,60 @@
 import pyqtgraph as pg
+import numpy as np
 
 from PyQt5 import QtCore
 from PyQt5.QtWidgets import QWidget, QMainWindow, QVBoxLayout
 from scipy import signal
-from signals import *
+from signals import SignalProcessor
 
 
-class SignalPlot(QWidget):
-    def __init__(self, window_size: int, sample_rate: int):
+class WidgetPlot(QWidget):
+    def __init__(self, sample_rate: int, background_color, styles, x_label: str, y_label: str, pen_color):
         super().__init__()
 
-        self.window_size = window_size
         self.sample_rate = sample_rate
+        self.values = None
 
-        self.time = np.linspace(0, self.window_size, window_size * self.sample_rate)
-        self.values = np.zeros(self.window_size * self.sample_rate)
-
+        # Creating widget
         self.plot_graph = pg.PlotWidget()
         layout = QVBoxLayout(self)
         layout.addWidget(self.plot_graph)
 
-        pen = pg.mkPen(color=(0, 0, 0))
+        self.pen = pg.mkPen(color=pen_color)
+        self.plot_graph.setBackground(background_color)
 
-        self.plot_graph.setBackground("w")
+        self.plot_graph.setLabel("left", y_label, **styles)
+        self.plot_graph.setLabel("bottom", x_label, **styles)
 
-        styles = {"color": "black", "font-size": "15px"}
-        self.plot_graph.setLabel("left", "Amplitude", **styles)
-        self.plot_graph.setLabel("bottom", "Time (min)", **styles)
+    def update_values(self, new_data):
+        self.values = new_data
 
-        self.line = self.plot_graph.plot(self.time, self.values, pen=pen)
 
-    def update_values(self, values_to_add, new_interval):
+class SignalPlot(WidgetPlot):
+    def __init__(self, sample_rate: int, window_size: int, background_color, styles, x_label: str, y_label: str,
+                 pen_color):
+        super().__init__(sample_rate, background_color, styles, x_label, y_label, pen_color)
+
+        self.window_size = window_size
+
+        self.time = np.linspace(0, self.window_size, window_size * self.sample_rate)
+        self.values = np.zeros(self.window_size * self.sample_rate)
+
+        self.line = self.plot_graph.plot(self.time, self.values, pen=self.pen)
+
+    def update_values(self, new_data):
+        new_interval = new_data.shape[0]
+
         self.values = self.values[new_interval:]
-        self.values = np.append(self.values, values_to_add)
+        self.values = np.append(self.values, new_data)
 
     def update_plot(self):
         self.line.setData(self.time, self.values)
 
 
-class FFTPlot(QWidget):
-    def __init__(self, sample_rate: int, interval: int, plot_type='log'):
-        super().__init__()
+class FFTPlot(WidgetPlot):
+    def __init__(self, sample_rate: int, interval: int, background_color, styles, x_label: str,
+                 y_label: str, pen_color, plot_type='log'):
+        super().__init__(sample_rate, background_color, styles, x_label, y_label, pen_color)
 
         self.sample_rate = sample_rate
         self.interval = interval
@@ -48,46 +62,19 @@ class FFTPlot(QWidget):
         # Creating array of frequencies
         self.freqs = np.linspace(0, sample_rate // 2, interval // 2)
 
-        # Defining values of the amplitude spectrum
+        # Defining zero values for the amplitude spectrum
         self.values = np.zeros(interval // 2)
 
-        # Creating widget
-        self.plot_graph = pg.PlotWidget()
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.plot_graph)
-
-        # Widget params
-        pen = pg.mkPen(color=(1, 1, 1))
-
-        self.plot_graph.setBackground("yellow")
-        self.plot_graph.setYRange(-180, 60)
-        styles = {"color": "black", "font-size": "15px"}
-        self.plot_graph.setLabel("left", "PSD [dB]", **styles)
-        self.plot_graph.setLabel("bottom", "Frequency [Hz]", **styles)
-
         if plot_type == 'log':
+            self.plot_graph.setYRange(-180, 60)
             self.plot_graph.setLogMode(x=True)
 
         # Plot data
-        self.line = self.plot_graph.plot(self.freqs, self.values, pen=pen)
-
-    def update_values(self, new_data):
-        # transformed_signal = signal_fft(new_data, interval)
-        # self.values = 20 * np.log(transformed_signal)
-        self.values = new_data
+        self.line = self.plot_graph.plot(self.freqs, self.values, pen=self.pen)
 
     def update_plot(self):
         self.plot_graph.setYRange(-10, 20)
         self.line.setData(self.freqs, self.values)
-
-        # Applying filter
-        # sos = signal.ellip(3, 5, 40, 300, 'hp', fs=self.sample_rate, output='sos')
-        # filtered_signal = signal.sosfilt(sos, get_signal)
-        #
-        # transformed_signal = signal_fft(filtered_signal, self.interval)
-        #
-        # self.values = 20 * np.log(transformed_signal)
-        # self.line.setData(self.freqs, self.values)
 
 
 class MyApp(QMainWindow):
@@ -103,8 +90,25 @@ class MyApp(QMainWindow):
         self.sound_recorder.record_signal(duration)
         self.sound_recorder.fft_signal(self.interval)
 
-        self.fft_widget = FFTPlot(self.sample_rate, 4410)
-        self.signal_widget = SignalPlot(10, self.sample_rate)
+        # Defining params for signal plot
+        window_size = 10
+        signal_styles = {"color": "black", "font-size": "15px"}
+        signal_x_label = "Time(sec)"
+        signal_y_label = "Amplitude"
+        signal_background = (18, 74, 168)
+
+        # Defining params for fft plot
+        fft_styles = {"color": "black", "font-size": "15px"}
+        fft_x_label = "Frequency [Hz]"
+        fft_y_label = "PSD [dB]"
+        fft_background = (255, 161, 0)
+
+        pen_color = (0, 0, 0)
+
+        self.fft_widget = FFTPlot(self.sample_rate, self.interval, fft_background, fft_styles, fft_x_label, fft_y_label,
+                                  pen_color, plot_type='log')
+        self.signal_widget = SignalPlot(self.sample_rate, window_size, signal_background, signal_styles,
+                                        signal_x_label, signal_y_label, pen_color)
 
         central_widget = QWidget()
         layout = QVBoxLayout(central_widget)
@@ -126,7 +130,7 @@ class MyApp(QMainWindow):
         self.sound_recorder.fft_signal(self.interval, output_type='linear')
 
         # Adding signal values to display
-        self.signal_widget.update_values(new_data, self.interval // 4)
+        self.signal_widget.update_values(new_data)
 
         # Adding spectrum values
         self.fft_widget.update_values(self.sound_recorder.fft_data)
