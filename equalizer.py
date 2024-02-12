@@ -51,13 +51,17 @@ def find_max_in_frequency_ranges(frequency_ranges, spectrum, sample_rate):
 
 
 if __name__ == '__main__':
-    interval = 4410
-    sample_rate = 44100
-    ranges = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 12000, 16000]
-
     pygame.init()
 
+    interval = 4410
+    sample_rate = 44100
+
+    sound_recorder = SignalProcessor(sample_rate)
+    sound_recorder.set_default_signal(interval)
+
+    ranges = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 12000, 16000]
     groups_of_squares = []
+
     n_squares_in_group = 12
     x_value = 100
     color_off = (255, 0, 0)
@@ -75,31 +79,21 @@ if __name__ == '__main__':
 
     clock = pygame.time.Clock()
 
-    sound = np.zeros(interval)
+    sc.fill((0, 0, 0))
 
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                exit()
+                pygame.quit()
+                sys.exit()
 
-        sound_fft = signal_fft(sound, interval)
+        sound_recorder.update_signal(interval // 4)
+        sound_recorder.fft_signal(interval, output_type='linear')
 
-        arr = find_max_in_frequency_ranges(ranges, sound_fft, sample_rate)
-        # print(arr)
-
-        new_interval = interval // 4
-        new_sound = record_signal(new_interval / sample_rate, sample_rate)
-
-        sound = sound[new_interval:]
-        sound = np.append(sound, new_sound)
-
-        sc.fill((0, 0, 0))
+        arr = find_max_in_frequency_ranges(ranges, sound_recorder.fft_data, sample_rate)
 
         for i in range(len(groups_of_squares)):
             groups_of_squares[i].draw(sc)
-
-        # value_coordinate += 1 / (5 * np.pi)
-        value = arr[0]
 
         pygame.display.update()
 

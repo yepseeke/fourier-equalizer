@@ -6,50 +6,81 @@ import matplotlib.pyplot as plt
 from scipy.fft import fft
 
 
-def moving_average(signal, window_size):
-    window = np.ones(window_size) / window_size
-    smoothed_signal = np.convolve(signal, window, mode='same')
+class SignalProcessor:
+    def __init__(self, sample_rate: int):
+        self.sample_rate = sample_rate
 
-    return smoothed_signal
+        self.audio_data = None
+        self.fft_data = None
 
+    def set_default_signal(self, interval):
+        self.audio_data = np.zeros(interval)
 
-def record_signal(duration: float, sample_rate: int):
-    recording = sd.rec(int(duration * sample_rate),
-                       samplerate=sample_rate, channels=1)
-    sd.wait()
+    def record_signal(self, duration: float):
+        self.audio_data = sd.rec(int(duration * self.sample_rate),
+                                 samplerate=self.sample_rate, channels=1)
+        sd.wait()
 
-    return recording
+    def update_signal(self, interval):
+        duration = interval / self.sample_rate
 
+        new_data = sd.rec(int(duration * self.sample_rate),
+                          samplerate=self.sample_rate, channels=1)
+        sd.wait()
 
-def write_signal_to_file(file_name: str, data, sample_rate: int):
-    wv.write(file_name, data, sample_rate, sampwidth=2)
+        new_data.reshape(-1)
 
+        self.audio_data = self.audio_data[interval:]
+        self.audio_data = np.append(self.audio_data, new_data)
 
-def signal_fft(signal, interval: int):
-    epsilon = 1e-7
-    transformed_signal = np.abs(fft(signal, interval))[0:interval // 2] + epsilon
+        self.fft_data = None
 
-    return transformed_signal
+        return new_data
 
+    def write_signal_to_file(self, file_name: str):
+        wv.write(file_name, self.audio_data, self.sample_rate, sampwidth=2)
 
-def plot_signal(signal, sample_rate: int, axs):
-    axs.set_title("Signal")
+    def fft_signal(self, interval, output_type='dB'):
+        epsilon = 1e-7
+        self.fft_data = np.abs(fft(self.audio_data, interval))[0:interval // 2] + epsilon
+        if output_type == 'dB':
+            self.fft_data = 20 * np.log10(self.fft_data)
 
-    signal_length = signal.shape[0] / sample_rate
-    time_list = np.linspace(0, signal_length, signal.shape[0])
-    axs.plot(time_list, signal, color='k')
+    def plot_signal(self, axs):
+        axs.set_title("Signal")
 
-    axs.set_xlabel("Time")
-    axs.set_ylabel("Amplitude")
+        signal_length = self.audio_data.shape[0] / self.sample_rate
+        time_list = np.linspace(0, signal_length, self.audio_data.shape[0])
+        axs.plot(time_list, self.audio_data, color='k')
 
+        axs.set_xlabel("Time")
+        axs.set_ylabel("Amplitude")
 
-def plot_fft(signal, interval: int, sample_rate: int, axs, plot_type='log'):
-    fft_abs = 20 * np.log10(signal_fft(signal, interval))
-    freqs = np.linspace(0, sample_rate // 2, interval // 2)
-    axs.plot(freqs, fft_abs, color='k')
+    def plot_fft(self, interval, axs, plot_type='log'):
+        if self.fft_data is None:
+            self.fft_signal(interval)
+        fft_abs = self.fft_data
+        freqs = np.linspace(0, self.sample_rate // 2, interval // 2)
+        axs.plot(freqs, fft_abs, color='k')
 
-    if plot_type == 'log':
-        axs.set_xscale('log')
+        if plot_type == 'log':
+            axs.set_xscale('log')
 
-    plt.xlabel('Frequency [Hz]')
-    plt.ylabel('PSD [dB]')
+        plt.xlabel('Frequency [Hz]')
+        plt.ylabel('PSD [dB]')
+
+    @property
+    def get_audio_data(self):
+        if self.audio_data is None:
+            raise ValueError("Audio data is not set")
+        return self.audio_data
+
+    @property
+    def get_fft_data(self):
+        if self.fft_data is None:
+            raise ValueError("Fourie-transform data is not set")
+        return self.fft_data
+
+    def moving_average(self, window_size):
+        window = np.ones(window_size) / window_size
+        self.audio_data = np.convolve(self.audio_data, window, mode='same')
